@@ -7,9 +7,7 @@
         "../src/",
         "."
     ],
-    "exposed-modules": [
-        "Kalman"
-    ],
+    "exposed-modules": [],
     "dependencies": {
         "CallumJHays/elm-unwrap": "1.0.0 <= v < 2.0.0",
         "eeue56/elm-all-dict": "2.0.1 <= v < 3.0.0",

@@ -7,6 +7,8 @@ module KalmanFilter
         , init
         , fromMeasurement
         , filter
+        , filterWithNoiseEstimates
+        , filterMeasurement
         , predictNext
         )
 
@@ -19,11 +21,23 @@ however this library is only equipped to deal with 1D data.
 For more information on the theory of the Kalman Filter, check out [a great
 intro paper here](http://www.cs.unc.edu/~welch/media/pdf/kalman_intro.pdf).
 
-# Model
+# Basic Usage
+
+These are the simplest way to get started using Kalman filters. You just apply
+the filter to the list and it works. Voila!~~
+
+@docs filter, filterWithNoiseEstimates
+
+# Advanced Usage
+
+These functions should be used if you don't like the way `filter` does
+stuff, or you need your implementation to be on-line (with rolling updates)
+
+## Model
 @docs Model, Params, State, defaultParams, init, fromMeasurement
 
-# Usage
-@docs filter, predictNext
+## Functions
+@docs filterMeasurement, predictNext
 -}
 
 -- Exposed Module Code
@@ -90,8 +104,8 @@ init optionalParams =
 to instantiate a `KalmanFilter.Model` as it converges much faster than when
 starting at 0.
 -}
-fromMeasurement : Float -> Maybe Params -> Model
-fromMeasurement measurement optionalParams =
+fromMeasurement : Maybe Params -> Float -> Model
+fromMeasurement optionalParams measurement =
     let
         model =
             init optionalParams
@@ -114,6 +128,30 @@ fromMeasurement measurement optionalParams =
         }
 
 
+{-| Filters a noisy signal, providing the predicted 'true' value of
+the signal. Makes working with kalman filters very easy.
+-}
+filter : Maybe Params -> List Float -> List Float
+filter optionalParams noisySignal =
+    let
+        allNothing =
+            noisySignal |> List.map (always Nothing)
+    in
+        List.map2 (,) noisySignal allNothing
+            |> filterMaybeNoiseEstimates optionalParams
+
+
+{-| Like `filter` but including noise estimation as the second item in
+the tuple of examples. If not appliccable for some signals, `0` can be supplied
+as the noiseEstimation.
+-}
+filterWithNoiseEstimates : Maybe Params -> List ( Float, Float ) -> List Float
+filterWithNoiseEstimates optionalParams noisySignalTuple =
+    noisySignalTuple
+        |> List.map (Tuple.mapSecond Just)
+        |> filterMaybeNoiseEstimates optionalParams
+
+
 {-| Run a measurement through a filter with an optional `controlFactor`,
 returning the model with its parameters updated to reflect the measurement
 recording.
@@ -122,10 +160,13 @@ What the filter thinks the maximum likelihood for the 'true' value of the last
 measurement should be can be accessed in the resulting `model.state.prediction`
 
 `maybeNoiseEstimation` may be provided to if an indicator of what the noise
-for this measurement is able to be provided.
+for this measurement is able to be provided. For example, if using the most
+likely value from a probability density histogram, the probability of the value
+inversely compared to the probability of the rest may be a good indicator of
+the amount of noise associated with a measurement.
 -}
-filter : Model -> Maybe Float -> Float -> Model
-filter model maybeNoiseEstimation measurement =
+filterMeasurement : Model -> Maybe Float -> Float -> Model
+filterMeasurement model maybeNoiseEstimation measurement =
     predictNext model maybeNoiseEstimation
         |> learn model measurement
 
@@ -174,3 +215,35 @@ learn model measurement prioriEstimate =
                           )
                 }
         }
+
+
+filterMaybeNoiseEstimates : Maybe Params -> List ( Float, Maybe Float ) -> List Float
+filterMaybeNoiseEstimates optionalParams examples =
+    let
+        ( noisySignal, maybeNoiseEstimate ) =
+            List.unzip examples
+
+        initialModel =
+            noisySignal
+                |> List.head
+                |> Maybe.withDefault 0
+                |> fromMeasurement optionalParams
+    in
+        examples
+            |> List.foldl
+                (\( measurement, maybeNoiseEstimate ) ->
+                    \( model, predictions ) ->
+                        let
+                            newModel =
+                                filterMeasurement
+                                    model
+                                    maybeNoiseEstimate
+                                    measurement
+                        in
+                            ( newModel
+                            , newModel.state.prediction :: predictions
+                            )
+                )
+                ( initialModel, [] )
+            |> Tuple.second
+            |> List.reverse
