@@ -1,7 +1,7 @@
 # elm-kalman-filter
 Simple 1D Kalman filters in Elm
 
-![kalman filter graph](./example.png "Example of a Kalman Filter acting on a noisy quadratic signal")
+![kalman filter graph](https://raw.githubusercontent.com/CallumJHays/elm-kalman-filter/master/example.png "Example of a Kalman Filter acting on a noisy quadratic signal")
 
 ## Installation 
 
