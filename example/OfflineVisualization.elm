@@ -222,33 +222,8 @@ view model =
             , measurementFactor = getSliderVal model MeasurementFactor
             }
 
-        filter =
-            KalmanFilter.fromMeasurement
-                (noisySignal |> (List.head >> Maybe.withDefault 0))
-                (Just filterParams)
-
         predictedSignal =
-            noisySignal
-                |> List.foldl
-                    (\measurement ->
-                        \( filter, predictions ) ->
-                            let
-                                newFilter =
-                                    KalmanFilter.filter
-                                        filter
-                                        Nothing
-                                        measurement
-
-                                prediction =
-                                    Debug.log
-                                        (newFilter.state.covariance |> toString)
-                                        newFilter.state.prediction
-                            in
-                                ( newFilter, prediction :: predictions )
-                    )
-                    ( filter, [] )
-                |> Tuple.second
-                |> List.reverse
+            KalmanFilter.filter (Just filterParams) noisySignal
 
         lineChartConfigDefault =
             LineChart.defaults
